@@ -22,13 +22,14 @@ Delivered in two phases:
 - Show live utilization % for 5-hour, weekly, and weekly-Sonnet windows.
 - Color-coded, pinnable menu bar label.
 - Zero-config auth: read the logged-in Claude Code OAuth token from the Keychain.
-- Survive token expiry by self-refreshing the OAuth token.
-- Refresh every 5 minutes + manual refresh.
+- Rely on Claude Code's daemon to keep the token fresh (no self-refresh).
+- Poll every 5 minutes + manual refresh.
 
 ## Non-Goals (Phase 1)
 
 - Multi-account support (single logged-in account only).
 - Manual token entry / settings screen.
+- OAuth token self-refresh (the Claude Code daemon owns refresh — see below).
 - WidgetKit widget (Phase 2).
 - Automated test suite (manual verification, matching the GLM repo).
 
@@ -83,7 +84,7 @@ ClaudeUsageWidget/
 
 ```
 UsageService.fetch()
-  → KeychainAuth.validToken()        // refresh if expiresAt passed or on 401
+  → KeychainAuth.currentToken()      // read-only; daemon keeps it fresh
   → GET /api/oauth/usage             // Bearer + anthropic-beta header
   → parse UsageResponse
   → publish UsageStats
@@ -125,43 +126,44 @@ enum PinnedWindow { case highest, hour, week, sonnet }  // persisted in UserDefa
 - `resets_at` parsed as ISO8601 → countdown ("resets in 2h 14m" / "resets Jun 5").
 - Menu bar label shows the pinned window's %; `.highest` → max of available windows.
 
-## Keychain Auth & OAuth Refresh
+## Keychain Auth (read-only)
 
-**Read:** `KeychainAuth.loadCredentials()` reads the generic-password item
+**Strategy: read-only. The widget never refreshes the token itself.**
+
+Rationale (confirmed empirically during design): Claude Code runs a persistent background
+daemon (`claude daemon run`) that proactively refreshes the OAuth token roughly every 8
+hours and writes it back to the Keychain. `daemon.log` shows a steady cadence:
+
+```
+auth: proactive refresh succeeded
+auth: scheduling proactive refresh in 28560s   # ≈ 7.93h
+```
+
+Because the daemon owns refresh, the keychain token is fresh nearly all the time. The widget
+duplicating that refresh would add a fragile dependency (OAuth endpoint host + `client_id`,
+both subject to change) and risk a keychain write-back conflict with the daemon. So the
+widget only reads.
+
+**Read:** `KeychainAuth.currentToken()` reads the generic-password item
 `service: "Claude Code-credentials"` via the Security framework (`SecItemCopyMatching`).
-Value JSON: `{ claudeAiOauth: { accessToken, refreshToken, expiresAt, ... } }`. First run
-triggers one OS keychain-access prompt — user clicks **Always Allow**.
+Value JSON: `{ claudeAiOauth: { accessToken, refreshToken, expiresAt, ... } }`. The widget
+uses `accessToken` (and reads `expiresAt` only to display token expiry / detect the stale
+window). First run triggers one OS keychain-access prompt — user clicks **Always Allow**.
 
-**Validity check:** before each fetch, compare `expiresAt` (epoch ms) to now minus a 60s
-safety margin. Still valid → use `accessToken` directly.
-
-**Refresh** (expired, or on HTTP 401):
-
-```
-POST https://console.anthropic.com/v1/oauth/token
-Content-Type: application/json
-{
-  "grant_type": "refresh_token",
-  "refresh_token": "<stored>",
-  "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e"   // public Claude Code client_id
-}
-→ { access_token, refresh_token, expires_in }
-```
-
-On success: update in-memory credential, then write the full JSON back to the same keychain
-item (`SecItemUpdate`) so Claude Code and the widget stay in sync.
-
-**Write-back fallback:** if `SecItemUpdate` is denied (ACL owned by Claude Code), keep the
-refreshed token in memory for the session and log a warning. Fetches still work; only
-persistence across restarts is lost until Claude Code refreshes it itself.
+**Stale window:** in rare cases (daemon not running and token already expired — observed as
+`daemon-auth-status.json` = `auth_required`), the token may be expired. The widget detects
+this via `expiresAt` in the past and/or an HTTP 401, and surfaces a clear
+"Token stale — open Claude Code to refresh" state. It self-heals automatically on the next
+fetch once the daemon (or any Claude Code launch) refreshes the token. No action by the
+widget beyond re-reading the keychain.
 
 **Secrets handling:** tokens never logged (redacted to first 8 chars, matching GLM widget).
-No tokens written to disk outside the Keychain.
+No tokens written to disk; the widget never writes to the Keychain.
 
-**Implementation caveat:** the exact refresh endpoint host (`console.anthropic.com` vs
-`api.anthropic.com`) and `client_id` are confirmed with a live test in the first build step
-before wiring the rest. If refresh proves unavailable, the widget degrades to read-only
-keychain (no refresh) and surfaces a "token may be stale" state.
+**Future upgrade (not in scope):** if the stale window proves disruptive in practice, a 401
+fallback self-refresh (OAuth `refresh_token` grant + write-back) can be added later. Tracked
+as a follow-up, deliberately excluded from v1 to avoid the fragile endpoint/`client_id`
+dependency.
 
 ## UI Layout
 
@@ -201,9 +203,8 @@ All states render in the dropdown; the app never crashes.
 |------------------------------------|------------------------------------------------|
 | No keychain item                   | "Not logged in — run Claude Code first"        |
 | Keychain access denied             | "Keychain access denied — click Allow"         |
-| 401 after refresh attempt          | "Auth expired — open Claude Code to refresh"   |
+| Expired token / HTTP 401           | "Token stale — open Claude Code to refresh"    |
 | Network error                      | "Offline — retrying" + dimmed last-good values |
-| Refresh endpoint unavailable       | Degrade to read-only + "token may be stale"    |
 
 ## Refresh Cadence
 
@@ -217,7 +218,8 @@ No test target (matches GLM repo). Manual verification:
 
 1. `curl` probe confirms endpoint + parses 3 windows (verified live during design ✓).
 2. Build + `open`, click menu bar, confirm 3 bars render with live values.
-3. Force-expire: set `expiresAt` to the past → confirm refresh path fires.
+3. Stale-token render: simulate a 401 / past `expiresAt` → confirm
+   "Token stale — open Claude Code" state shows and clears on next good fetch.
 4. Null-window render: confirm Sonnet shows greyed.
 
 ## Build
