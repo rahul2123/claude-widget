@@ -66,20 +66,25 @@ struct ClaudeLogo: View {
     var size: CGFloat
     var color: Color = Color(red: 0.85, green: 0.47, blue: 0.36)  // Claude coral #D9785C
 
-    private static let bundled: NSImage? = {
-        guard let url = Bundle.main.url(forResource: "claude-logo", withExtension: "png"),
-              let img = NSImage(contentsOf: url) else { return nil }
-        img.isTemplate = false
-        return img
+    private static let base: NSImage? = {
+        guard let url = Bundle.main.url(forResource: "claude-logo", withExtension: "png") else { return nil }
+        return NSImage(contentsOf: url)
     }()
 
+    /// Returns a copy sized to `pt` points. The menu bar renders an NSImage at
+    /// its `.size`, ignoring SwiftUI `.frame()`, so we set the size explicitly.
+    private static func sized(_ pt: CGFloat) -> NSImage? {
+        guard let base = base, let copy = base.copy() as? NSImage else { return nil }
+        copy.size = NSSize(width: pt, height: pt)
+        copy.isTemplate = false
+        return copy
+    }
+
     var body: some View {
-        if let img = Self.bundled {
+        if let img = Self.sized(size) {
             Image(nsImage: img)
-                .resizable()
                 .renderingMode(.original)
                 .interpolation(.high)
-                .frame(width: size, height: size)
                 .clipShape(RoundedRectangle(cornerRadius: size * 0.22))
         } else {
             VectorMark(size: size, color: color)
