@@ -61,10 +61,16 @@ struct MenuBarLabel: View {
 // MARK: - Shared color logic
 
 enum UsageColor {
+    // Vivid, high-contrast palette (reads on any background).
+    static let vividGreen  = Color(red: 0.30, green: 0.85, blue: 0.39)
+    static let vividAmber  = Color(red: 1.00, green: 0.80, blue: 0.00)
+    static let vividOrange = Color(red: 1.00, green: 0.55, blue: 0.10)
+    static let vividRed    = Color(red: 1.00, green: 0.27, blue: 0.23)
+
     static func forPercentage(_ p: Double) -> Color {
-        if p >= 90 { return .red }
-        else if p >= 70 { return .orange }
-        else if p >= 50 { return .yellow }
-        else { return .green }
+        if p >= 90 { return vividRed }
+        else if p >= 70 { return vividOrange }
+        else if p >= 50 { return vividAmber }
+        else { return vividGreen }
     }
 }

@@ -89,35 +89,38 @@ final class DesktopWidgetController: ObservableObject {
 struct DesktopWidgetView: View {
     @ObservedObject var service: UsageService
 
+    private let panelBG = Color(red: 0.11, green: 0.11, blue: 0.12)  // #1c1c1e
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 11) {
             HStack(spacing: 5) {
-                Image(systemName: "gauge.medium").font(.system(size: 11))
-                Text("Claude Usage").font(.system(size: 11, weight: .semibold))
+                Image(systemName: "gauge.medium")
+                    .font(.system(size: 12)).foregroundColor(.white.opacity(0.9))
+                Text("Claude Usage")
+                    .font(.system(size: 12, weight: .semibold)).foregroundColor(.white)
                 Spacer()
             }
 
             if let error = service.errorMessage, service.stats == nil {
                 Text(error)
-                    .font(.system(size: 10)).foregroundColor(.secondary)
+                    .font(.system(size: 10)).foregroundColor(.white.opacity(0.7))
                     .fixedSize(horizontal: false, vertical: true)
             } else if let stats = service.stats {
                 CompactBar(title: "5h", stat: stats.hour)
                 CompactBar(title: "Week", stat: stats.week)
                 CompactBar(title: "Sonnet", stat: stats.sonnetWeek)
             } else {
-                Text("Loading…").font(.system(size: 10)).foregroundColor(.secondary)
+                Text("Loading…").font(.system(size: 10)).foregroundColor(.white.opacity(0.7))
             }
         }
-        .padding(14)
-        .frame(width: 220, alignment: .leading)
+        .padding(15)
+        .frame(width: 230, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 14).fill(panelBG)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
         )
     }
 }
@@ -129,24 +132,34 @@ struct CompactBar: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(title)
-                .font(.system(size: 10))
-                .foregroundColor(stat.available ? .primary : .secondary)
-                .frame(width: 42, alignment: .leading)
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3).fill(Color.gray.opacity(0.2))
-                    if stat.available {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(UsageColor.forPercentage(stat.pct))
-                            .frame(width: geo.size.width * CGFloat(min(stat.pct, 100) / 100))
-                    }
+                .font(.system(size: 11))
+                .foregroundColor(stat.available ? .white : .white.opacity(0.45))
+                .frame(width: 46, alignment: .leading)
+            UsageTrack(stat: stat, trackColor: .white.opacity(0.16))
+                .frame(height: 8)
+            Text(stat.available ? "\(Int(stat.pct))%" : "—")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(stat.available ? UsageColor.forPercentage(stat.pct) : .white.opacity(0.45))
+                .frame(width: 34, alignment: .trailing)
+        }
+    }
+}
+
+/// Progress track with a guaranteed minimum-visible fill when pct > 0.
+struct UsageTrack: View {
+    let stat: WindowStat
+    let trackColor: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(trackColor)
+                if stat.available && stat.pct > 0 {
+                    Capsule()
+                        .fill(UsageColor.forPercentage(stat.pct))
+                        .frame(width: max(6, geo.size.width * CGFloat(min(stat.pct, 100) / 100)))
                 }
             }
-            .frame(height: 6)
-            Text(stat.available ? "\(Int(stat.pct))%" : "—")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(stat.available ? UsageColor.forPercentage(stat.pct) : .secondary)
-                .frame(width: 32, alignment: .trailing)
         }
     }
 }

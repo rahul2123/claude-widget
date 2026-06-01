@@ -112,7 +112,8 @@ struct WindowRow: View {
                     Text("—").font(.system(size: 11)).foregroundColor(.secondary)
                 }
             }
-            bar
+            UsageTrack(stat: stat, trackColor: Color.gray.opacity(0.25))
+                .frame(height: 8)
             if stat.available {
                 if let reset = stat.resetTime {
                     Text("resets \(resetText(reset))")
@@ -123,20 +124,6 @@ struct WindowRow: View {
                     .font(.system(size: 10)).foregroundColor(.secondary)
             }
         }
-    }
-
-    private var bar: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 3).fill(Color.gray.opacity(0.15))
-                if stat.available {
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(UsageColor.forPercentage(stat.pct))
-                        .frame(width: geo.size.width * CGFloat(min(stat.pct, 100) / 100))
-                }
-            }
-        }
-        .frame(height: 6)
     }
 
     private func resetText(_ date: Date) -> String {
