@@ -19,23 +19,23 @@ cp "bin/${BINARY_NAME}" "${MACOS_PATH}/"
 # Copy Info.plist
 cp "ClaudeUsageWidget/Info.plist" "${CONTENTS_PATH}/"
 
-# Build .icns from PNGs if an icon set is present (optional — falls back to default icon)
-ICONS_DIR="ClaudeUsageWidget/Assets.xcassets/AppIcon.appiconset"
-if [ -f "${ICONS_DIR}/app-icon-512.png" ]; then
+# Copy bundled resources (Claude logo)
+if [ -f "ClaudeUsageWidget/Resources/claude-logo.png" ]; then
+  cp "ClaudeUsageWidget/Resources/claude-logo.png" "${RESOURCES_PATH}/"
+fi
+
+# Generate the app/dock icon (.icns) from the Claude logo via sips upscaling.
+LOGO="ClaudeUsageWidget/Resources/claude-logo.png"
+if [ -f "${LOGO}" ]; then
   ICONSET_PATH="/tmp/ClaudeAppIcon.iconset"
-  rm -rf "${ICONSET_PATH}"
-  mkdir -p "${ICONSET_PATH}"
-  cp "${ICONS_DIR}/app-icon-16.png"   "${ICONSET_PATH}/icon_16x16.png"
-  cp "${ICONS_DIR}/app-icon-32.png"   "${ICONSET_PATH}/icon_16x16@2x.png"
-  cp "${ICONS_DIR}/app-icon-32.png"   "${ICONSET_PATH}/icon_32x32.png"
-  cp "${ICONS_DIR}/app-icon-64.png"   "${ICONSET_PATH}/icon_32x32@2x.png"
-  cp "${ICONS_DIR}/app-icon-128.png"  "${ICONSET_PATH}/icon_128x128.png"
-  cp "${ICONS_DIR}/app-icon-256.png"  "${ICONSET_PATH}/icon_128x128@2x.png"
-  cp "${ICONS_DIR}/app-icon-256.png"  "${ICONSET_PATH}/icon_256x256.png"
-  cp "${ICONS_DIR}/app-icon-512.png"  "${ICONSET_PATH}/icon_256x256@2x.png"
-  cp "${ICONS_DIR}/app-icon-512.png"  "${ICONSET_PATH}/icon_512x512.png"
-  cp "${ICONS_DIR}/app-icon-1024.png" "${ICONSET_PATH}/icon_512x512@2x.png"
-  iconutil -c icns "${ICONSET_PATH}" -o "${RESOURCES_PATH}/AppIcon.icns"
+  rm -rf "${ICONSET_PATH}"; mkdir -p "${ICONSET_PATH}"
+  for spec in "16:icon_16x16" "32:icon_16x16@2x" "32:icon_32x32" "64:icon_32x32@2x" \
+              "128:icon_128x128" "256:icon_128x128@2x" "256:icon_256x256" \
+              "512:icon_256x256@2x" "512:icon_512x512" "1024:icon_512x512@2x"; do
+    px="${spec%%:*}"; name="${spec##*:}"
+    sips -z "${px}" "${px}" "${LOGO}" --out "${ICONSET_PATH}/${name}.png" >/dev/null 2>&1
+  done
+  iconutil -c icns "${ICONSET_PATH}" -o "${RESOURCES_PATH}/AppIcon.icns" 2>/dev/null
   rm -rf "${ICONSET_PATH}"
   /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "${CONTENTS_PATH}/Info.plist" 2>/dev/null || true
 fi

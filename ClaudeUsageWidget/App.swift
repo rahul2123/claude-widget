@@ -60,13 +60,38 @@ struct MenuBarLabel: View {
 
 // MARK: - Shared color logic
 
-// MARK: - Claude logo (sunburst mark, drawn as a vector)
+// MARK: - Claude logo (official PNG with a vector fallback)
 
 struct ClaudeLogo: View {
     var size: CGFloat
     var color: Color = Color(red: 0.85, green: 0.47, blue: 0.36)  // Claude coral #D9785C
 
-    // Ray lengths (fraction of radius) around the circle — uneven, like the real mark.
+    private static let bundled: NSImage? = {
+        guard let url = Bundle.main.url(forResource: "claude-logo", withExtension: "png"),
+              let img = NSImage(contentsOf: url) else { return nil }
+        img.isTemplate = false
+        return img
+    }()
+
+    var body: some View {
+        if let img = Self.bundled {
+            Image(nsImage: img)
+                .resizable()
+                .renderingMode(.original)
+                .interpolation(.high)
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: size * 0.22))
+        } else {
+            VectorMark(size: size, color: color)
+        }
+    }
+}
+
+// Drawn fallback used only if the bundled PNG is missing.
+struct VectorMark: View {
+    var size: CGFloat
+    var color: Color
+
     private let rays: [CGFloat] = [
         1.00, 0.62, 0.90, 0.55, 1.00, 0.62,
         0.90, 0.55, 1.00, 0.62, 0.90, 0.55,
