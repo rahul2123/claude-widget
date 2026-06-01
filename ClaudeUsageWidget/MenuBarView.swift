@@ -36,7 +36,8 @@ struct HeaderView: View {
     @Binding var showingAbout: Bool
 
     var body: some View {
-        HStack {
+        HStack(spacing: 6) {
+            ClaudeLogo(size: 15)
             Text("Claude Usage").font(.system(size: 13, weight: .semibold))
             Spacer()
             Button { service.fetchUsage() } label: {

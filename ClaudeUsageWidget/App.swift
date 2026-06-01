@@ -28,7 +28,7 @@ struct MenuBarLabel: View {
 
     var body: some View {
         HStack(spacing: 3) {
-            Image(systemName: "gauge.medium")
+            ClaudeLogo(size: 14)
             if let error = service.errorMessage, service.stats == nil {
                 Text("⚠️").font(.system(size: 12))
                     .help(error)
@@ -59,6 +59,41 @@ struct MenuBarLabel: View {
 }
 
 // MARK: - Shared color logic
+
+// MARK: - Claude logo (sunburst mark, drawn as a vector)
+
+struct ClaudeLogo: View {
+    var size: CGFloat
+    var color: Color = Color(red: 0.85, green: 0.47, blue: 0.36)  // Claude coral #D9785C
+
+    // Ray lengths (fraction of radius) around the circle — uneven, like the real mark.
+    private let rays: [CGFloat] = [
+        1.00, 0.62, 0.90, 0.55, 1.00, 0.62,
+        0.90, 0.55, 1.00, 0.62, 0.90, 0.55,
+    ]
+
+    var body: some View {
+        Canvas { ctx, sz in
+            let c = CGPoint(x: sz.width / 2, y: sz.height / 2)
+            let r = min(sz.width, sz.height) / 2
+            let inner = r * 0.16
+            let lineW = max(1, r * 0.18)
+            let count = rays.count
+            for i in 0..<count {
+                let angle = (2 * CGFloat.pi / CGFloat(count)) * CGFloat(i) - .pi / 2
+                let outer = r * rays[i]
+                var path = Path()
+                path.move(to: CGPoint(x: c.x + cos(angle) * inner,
+                                      y: c.y + sin(angle) * inner))
+                path.addLine(to: CGPoint(x: c.x + cos(angle) * outer,
+                                         y: c.y + sin(angle) * outer))
+                ctx.stroke(path, with: .color(color),
+                           style: StrokeStyle(lineWidth: lineW, lineCap: .round))
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
 
 enum UsageColor {
     // Vivid, high-contrast palette (reads on any background).

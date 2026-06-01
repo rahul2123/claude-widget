@@ -93,9 +93,8 @@ struct DesktopWidgetView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 11) {
-            HStack(spacing: 5) {
-                Image(systemName: "gauge.medium")
-                    .font(.system(size: 12)).foregroundColor(.white.opacity(0.9))
+            HStack(spacing: 6) {
+                ClaudeLogo(size: 14)
                 Text("Claude Usage")
                     .font(.system(size: 12, weight: .semibold)).foregroundColor(.white)
                 Spacer()
