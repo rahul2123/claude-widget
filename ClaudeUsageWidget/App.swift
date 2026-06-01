@@ -2,11 +2,18 @@ import SwiftUI
 
 @main
 struct ClaudeUsageWidgetApp: App {
-    @StateObject private var service = UsageService()
+    @StateObject private var service: UsageService
+    @StateObject private var desktop: DesktopWidgetController
+
+    init() {
+        let svc = UsageService()
+        _service = StateObject(wrappedValue: svc)
+        _desktop = StateObject(wrappedValue: DesktopWidgetController(service: svc))
+    }
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView(service: service)
+            MenuBarView(service: service, desktop: desktop)
         } label: {
             MenuBarLabel(service: service)
         }

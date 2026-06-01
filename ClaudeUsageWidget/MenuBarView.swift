@@ -4,6 +4,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     @ObservedObject var service: UsageService
+    @ObservedObject var desktop: DesktopWidgetController
     @State private var showingAbout = false
 
     var body: some View {
@@ -18,7 +19,7 @@ struct MenuBarView: View {
                 Divider().padding(.vertical, 8)
                 PinSelectorView(service: service)
                 Divider().padding(.vertical, 8)
-                FooterView(service: service)
+                FooterView(service: service, desktop: desktop)
             }
         }
         .padding(16)
@@ -186,14 +187,21 @@ struct PinSelectorView: View {
 
 struct FooterView: View {
     @ObservedObject var service: UsageService
+    @ObservedObject var desktop: DesktopWidgetController
 
     var body: some View {
-        HStack {
+        HStack(spacing: 12) {
             if let stats = service.stats {
                 Text("updated \(timeString(stats.lastUpdated))")
                     .font(.system(size: 10)).foregroundColor(.secondary)
             }
             Spacer()
+            Button(desktop.isVisible ? "Hide widget" : "Show widget") {
+                desktop.toggle()
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 11))
+            .foregroundColor(.accentColor)
             Button("Quit") { NSApplication.shared.terminate(nil) }
                 .buttonStyle(.plain)
                 .font(.system(size: 11))
