@@ -24,6 +24,8 @@ struct MenuBarView: View {
         }
         .padding(16)
         .frame(width: 300)
+        .background(Color(red: 0.11, green: 0.11, blue: 0.12))  // #1c1c1e, matches desktop panel
+        .environment(\.colorScheme, .dark)                       // flip adaptive text to white
     }
 }
 
