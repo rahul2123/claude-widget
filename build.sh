@@ -15,6 +15,7 @@ mkdir -p "${RESOURCES_PATH}"
 
 # Copy executable
 cp "bin/${BINARY_NAME}" "${MACOS_PATH}/"
+codesign --sign - --force "${MACOS_PATH}/${BINARY_NAME}"
 
 # Copy Info.plist
 cp "ClaudeUsageWidget/Info.plist" "${CONTENTS_PATH}/"
@@ -39,6 +40,8 @@ if [ -f "${LOGO}" ]; then
   rm -rf "${ICONSET_PATH}"
   /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "${CONTENTS_PATH}/Info.plist" 2>/dev/null || true
 fi
+
+codesign --sign - --force --deep "${APP_PATH}"
 
 echo "Built app bundle at: ${APP_PATH}"
 echo "To run: open '${APP_PATH}'"
