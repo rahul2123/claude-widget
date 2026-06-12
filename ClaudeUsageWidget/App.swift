@@ -45,32 +45,29 @@ struct MenuBarLabel: View {
         }
     }
 
-    @ViewBuilder
-    private func bothLabel(stats: UsageStats) -> some View {
+    private func bothLabel(stats: UsageStats) -> Text {
         let hourOK = stats.hour.available
         let weekOK = stats.week.available
         if hourOK && weekOK {
-            HStack(spacing: 2) {
-                Text("\(Int(stats.hour.pct))%")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(UsageColor.forPercentage(stats.hour.pct))
-                Text("/")
-                    .font(.system(size: 12))
-                    .foregroundColor(Color(red: 0.39, green: 0.39, blue: 0.40))
-                Text("\(Int(stats.week.pct))%")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(UsageColor.forPercentage(stats.week.pct))
-            }
+            return Text("\(Int(stats.hour.pct))%")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(UsageColor.forPercentage(stats.hour.pct))
+            + Text(" / ")
+                .font(.system(size: 12))
+                .foregroundColor(Color(red: 0.39, green: 0.39, blue: 0.40))
+            + Text("\(Int(stats.week.pct))%")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(UsageColor.forPercentage(stats.week.pct))
         } else if hourOK {
-            Text("\(Int(stats.hour.pct))%")
+            return Text("\(Int(stats.hour.pct))%")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(UsageColor.forPercentage(stats.hour.pct))
         } else if weekOK {
-            Text("\(Int(stats.week.pct))%")
+            return Text("\(Int(stats.week.pct))%")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(UsageColor.forPercentage(stats.week.pct))
         } else {
-            Text("—").font(.system(size: 12)).foregroundColor(.secondary)
+            return Text("—").font(.system(size: 12)).foregroundColor(.secondary)
         }
     }
 
