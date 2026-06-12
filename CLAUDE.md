@@ -15,7 +15,7 @@ Compile the binary, then assemble the app bundle:
 # Compile (from repo root)
 swiftc ClaudeUsageWidget/*.swift \
   -o bin/ClaudeUsageWidget \
-  -framework SwiftUI -framework AppKit -framework Security \
+  -framework SwiftUI -framework AppKit -framework Security -framework UserNotifications \
   -target arm64-apple-macos13.0
 
 # Bundle

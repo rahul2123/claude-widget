@@ -51,7 +51,7 @@ This is idempotent — safe to run multiple times, does nothing if the cert alre
 # Compile
 swiftc ClaudeUsageWidget/*.swift \
   -o bin/ClaudeUsageWidget \
-  -framework SwiftUI -framework AppKit -framework Security \
+  -framework SwiftUI -framework AppKit -framework Security -framework UserNotifications \
   -target arm64-apple-macos13.0
 
 # Bundle (signs automatically with the cert from step 2)
