@@ -134,17 +134,22 @@ struct CompactBar: View {
                 .font(.system(size: 11))
                 .foregroundColor(stat.available ? .white : .white.opacity(0.45))
                 .frame(width: 46, alignment: .leading)
-            UsageTrack(stat: stat, trackColor: .white.opacity(0.16))
-                .frame(height: 8)
+            UsageTrack(
+                stat: stat,
+                trackColor: Color(red: 0.173, green: 0.173, blue: 0.180)
+            )
+            .frame(height: 6)
             Text(stat.available ? "\(Int(stat.pct))%" : "—")
                 .font(.system(size: 11, weight: .bold))
-                .foregroundColor(stat.available ? UsageColor.forPercentage(stat.pct) : .white.opacity(0.45))
+                .foregroundColor(stat.available
+                    ? UsageColor.forPercentage(stat.pct)
+                    : .white.opacity(0.45))
                 .frame(width: 34, alignment: .trailing)
         }
     }
 }
 
-/// Progress track with a guaranteed minimum-visible fill when pct > 0.
+/// Progress track with gradient fill and glow.
 struct UsageTrack: View {
     let stat: WindowStat
     let trackColor: Color
@@ -152,10 +157,16 @@ struct UsageTrack: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(trackColor)
+                RoundedRectangle(cornerRadius: 3).fill(trackColor)
                 if stat.available && stat.pct > 0 {
-                    Capsule()
-                        .fill(UsageColor.forPercentage(stat.pct))
+                    let colors = UsageColor.gradientColors(for: stat.pct)
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(LinearGradient(
+                            colors: [colors.start, colors.end],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ))
+                        .shadow(color: colors.glow, radius: 3, x: 0, y: 0)
                         .frame(width: max(6, geo.size.width * CGFloat(min(stat.pct, 100) / 100)))
                 }
             }
