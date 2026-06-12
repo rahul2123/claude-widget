@@ -51,6 +51,7 @@ struct MenuBarLabel: View {
         case .hour:    return stats.hour.available ? stats.hour.pct : nil
         case .week:    return stats.week.available ? stats.week.pct : nil
         case .sonnet:  return stats.sonnetWeek.available ? stats.sonnetWeek.pct : nil
+        case .bothHourWeek: return nil  // handled in body; replaced fully in Task 5
         case .highest:
             let available = [stats.hour, stats.week, stats.sonnetWeek].filter { $0.available }
             return available.map { $0.pct }.max()

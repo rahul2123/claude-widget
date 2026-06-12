@@ -82,14 +82,15 @@ struct UsageStats {
 // MARK: - Pinned Window (menu bar label selection)
 
 enum PinnedWindow: String, CaseIterable {
-    case highest, hour, week, sonnet
+    case highest, hour, week, sonnet, bothHourWeek
 
     var label: String {
         switch self {
-        case .highest: return "highest"
-        case .hour:    return "5h"
-        case .week:    return "week"
-        case .sonnet:  return "sonnet"
+        case .highest:      return "highest"
+        case .hour:         return "5h"
+        case .week:         return "week"
+        case .sonnet:       return "sonnet"
+        case .bothHourWeek: return "5h+Wk"
         }
     }
 }
