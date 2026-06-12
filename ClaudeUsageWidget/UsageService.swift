@@ -1,41 +1,68 @@
 import Foundation
 import Combine
 
-/// Fetches Claude usage from the Anthropic OAuth usage endpoint and publishes
-/// a display-ready `UsageStats`. Read-only auth: the token comes from the
-/// Keychain (kept fresh by Claude Code's daemon).
 class UsageService: ObservableObject {
     @Published var stats: UsageStats?
     @Published var errorMessage: String?
     @Published var isLoading = false
     @Published var subscriptionType: String?
     @Published var tokenExpiresAt: Date?
+    @Published var historyPoints: [Double] = []
 
-    /// Persisted in UserDefaults; controls which window the menu bar label shows.
     @Published var pinned: PinnedWindow {
         didSet { UserDefaults.standard.set(pinned.rawValue, forKey: Self.pinnedKey) }
     }
 
-    private static let pinnedKey = "pinnedWindow"
-    private static let usageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
+    @Published var refreshMinutes: Int {
+        didSet {
+            UserDefaults.standard.set(refreshMinutes, forKey: Self.refreshKey)
+            restartTimer()
+        }
+    }
+
+    @Published var alertThreshold: Int {
+        didSet { UserDefaults.standard.set(alertThreshold, forKey: Self.alertKey) }
+    }
+
+    private static let pinnedKey  = "pinnedWindow"
+    private static let refreshKey = "refreshIntervalMinutes"
+    private static let alertKey   = "alertThreshold"
+    private static let usageURL   = URL(string: "https://api.anthropic.com/api/oauth/usage")!
     private static let betaHeader = "oauth-2025-04-20"
 
     private var timer: Timer?
     private var task: URLSessionDataTask?
+    private var alertedWindows: Set<String> = []
 
     init() {
-        let stored = UserDefaults.standard.string(forKey: Self.pinnedKey)
-        self.pinned = stored.flatMap(PinnedWindow.init) ?? .highest
-        log("🔧 UsageService init")
-        startFetching()
+        let storedPin = UserDefaults.standard.string(forKey: Self.pinnedKey)
+        self.pinned = storedPin.flatMap(PinnedWindow.init) ?? .highest
+
+        let storedRefresh = UserDefaults.standard.integer(forKey: Self.refreshKey)
+        self.refreshMinutes = storedRefresh > 0 ? storedRefresh : 5
+
+        self.alertThreshold = UserDefaults.standard.integer(forKey: Self.alertKey)
+
+        self.historyPoints = UsageHistoryStore.shared.points.map { $0.hourPct }
+
+        log("🔧 UsageService init — refresh=\(refreshMinutes)m alert=\(alertThreshold)%")
+        fetchUsage()
+        scheduleTimer()
     }
 
-    private func startFetching() {
-        fetchUsage()
-        timer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+    private func scheduleTimer() {
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(
+            withTimeInterval: Double(refreshMinutes * 60),
+            repeats: true
+        ) { [weak self] _ in
             self?.log("⏰ Timer fired — refreshing")
             self?.fetchUsage()
         }
+    }
+
+    func restartTimer() {
+        scheduleTimer()
     }
 
     func fetchUsage() {
@@ -52,7 +79,6 @@ class UsageService: ObservableObject {
             subscriptionType = creds.subscriptionType
             tokenExpiresAt = creds.expiresAt
 
-            // If the token is already expired, the daemon hasn't refreshed yet.
             if let exp = creds.expiresAt, exp < Date() {
                 log("⚠️ token expired at \(exp)")
                 isLoading = false
@@ -111,9 +137,18 @@ class UsageService: ObservableObject {
 
         do {
             let decoded = try JSONDecoder().decode(UsageResponse.self, from: data)
-            stats = UsageStats(from: decoded, lastUpdated: Date())
+            let newStats = UsageStats(from: decoded, lastUpdated: Date())
+            stats = newStats
             errorMessage = nil
-            log("✅ updated: 5h=\(Int(stats?.hour.pct ?? -1))% 7d=\(Int(stats?.week.pct ?? -1))%")
+
+            if newStats.hour.available {
+                UsageHistoryStore.shared.append(hourPct: newStats.hour.pct)
+                historyPoints = UsageHistoryStore.shared.points.map { $0.hourPct }
+            }
+
+            AlertService.check(stats: newStats, threshold: alertThreshold, alerted: &alertedWindows)
+
+            log("✅ updated: 5h=\(Int(newStats.hour.pct))% 7d=\(Int(newStats.week.pct))%")
         } catch {
             log("❌ decode error: \(error)")
             errorMessage = "Could not parse usage data"
