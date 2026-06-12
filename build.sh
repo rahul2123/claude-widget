@@ -4,6 +4,18 @@ set -e
 
 BINARY_NAME="ClaudeUsageWidget"
 APP_DISPLAY_NAME="Claude Usage Monitor"
+
+# Stable code-signing identity (see create-signing-cert.sh). Signing with a cert
+# instead of ad-hoc gives a cert-leaf-based designated requirement that survives
+# rebuilds, so the keychain "Always Allow" decision persists. Falls back to ad-hoc
+# if the cert is missing (run ./create-signing-cert.sh once to create it).
+SIGN_IDENTITY="Claude Widget Code Signing"
+if ! security find-certificate -c "${SIGN_IDENTITY}" >/dev/null 2>&1; then
+  echo "WARNING: signing identity '${SIGN_IDENTITY}' not found — falling back to ad-hoc."
+  echo "         Run ./create-signing-cert.sh once to stop repeated keychain prompts."
+  SIGN_IDENTITY="-"
+fi
+
 APP_PATH="build/${APP_DISPLAY_NAME}.app"
 CONTENTS_PATH="${APP_PATH}/Contents"
 MACOS_PATH="${CONTENTS_PATH}/MacOS"
@@ -15,7 +27,7 @@ mkdir -p "${RESOURCES_PATH}"
 
 # Copy executable
 cp "bin/${BINARY_NAME}" "${MACOS_PATH}/"
-codesign --sign - --force "${MACOS_PATH}/${BINARY_NAME}"
+codesign --sign "${SIGN_IDENTITY}" --force "${MACOS_PATH}/${BINARY_NAME}"
 
 # Copy Info.plist
 cp "ClaudeUsageWidget/Info.plist" "${CONTENTS_PATH}/"
@@ -41,7 +53,7 @@ if [ -f "${LOGO}" ]; then
   /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "${CONTENTS_PATH}/Info.plist" 2>/dev/null || true
 fi
 
-codesign --sign - --force --deep "${APP_PATH}"
+codesign --sign "${SIGN_IDENTITY}" --force --deep "${APP_PATH}"
 
 echo "Built app bundle at: ${APP_PATH}"
 echo "To run: open '${APP_PATH}'"

@@ -22,14 +22,25 @@ swiftc ClaudeUsageWidget/*.swift \
 ./build.sh
 ```
 
-`build.sh` assembles `build/Claude Usage Monitor.app` — copies binary, Info.plist, logo PNG, and generates `.icns` via `sips`/`iconutil`.
+`build.sh` assembles `build/Claude Usage Monitor.app` — copies binary, Info.plist, logo PNG, generates `.icns` via `sips`/`iconutil`, and code-signs with the stable self-signed identity `Claude Widget Code Signing` (ad-hoc fallback if absent).
 
 To run after building:
 ```bash
 open 'build/Claude Usage Monitor.app'
 ```
 
-First launch on a new machine: right-click → Open (unsigned binary). macOS will also prompt to allow Keychain access — click Allow.
+### Code signing & keychain persistence
+
+The app reads Claude Code's OAuth token from the keychain. macOS stores the "Always Allow" decision as the calling app's *designated requirement*. Ad-hoc signing yields a cdhash-based identity that changes every rebuild, so the decision dies and macOS re-prompts. Signing with a certificate gives a cert-leaf-based DR (`identifier "com.claudeusagewidget.app" and certificate leaf = H"…"`) that survives rebuilds.
+
+First-time setup on a machine (run once):
+```bash
+./create-signing-cert.sh   # creates persistent self-signed code-signing cert in login keychain
+./build.sh                 # signs with it
+```
+Then launch and click **Always Allow** at the keychain prompt — once. Future rebuilds keep the same DR, so no further prompts. The cert is local/self-signed (no Apple account); `create-signing-cert.sh` is idempotent — never regenerate, or the DR changes and you re-authorize.
+
+No Xcode, no SPM, no test suite — `swiftc` direct compile only.
 
 No Xcode, no SPM, no test suite — `swiftc` direct compile only.
 
