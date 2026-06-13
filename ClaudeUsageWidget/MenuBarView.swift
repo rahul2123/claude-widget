@@ -80,12 +80,14 @@ struct UsageContentView: View {
         if let error = service.errorMessage, service.stats == nil {
             ErrorView(message: error)
         } else if let stats = service.stats {
-            VStack(spacing: 12) {
-                WindowRow(title: "5-hour", stat: stats.hour)
-                WindowRow(title: "Week", stat: stats.week)
-                WindowRow(title: "Sonnet (week)", stat: stats.sonnetWeek)
-                if stats.opusWeek.available {
-                    WindowRow(title: "Opus (week)", stat: stats.opusWeek)
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                VStack(spacing: 12) {
+                    WindowRow(title: "5-hour", stat: stats.hour, now: context.date)
+                    WindowRow(title: "Week", stat: stats.week, now: context.date)
+                    WindowRow(title: "Sonnet (week)", stat: stats.sonnetWeek, now: context.date)
+                    if stats.opusWeek.available {
+                        WindowRow(title: "Opus (week)", stat: stats.opusWeek, now: context.date)
+                    }
                 }
             }
         } else {
@@ -124,6 +126,7 @@ struct ErrorView: View {
 struct WindowRow: View {
     let title: String
     let stat: WindowStat
+    var now: Date = Date()
 
     private let labelColor  = Color(red: 0.682, green: 0.682, blue: 0.698)  // #aeaeb2
     private let secondColor = Color(red: 0.282, green: 0.282, blue: 0.290)  // #48484a
@@ -146,7 +149,7 @@ struct WindowRow: View {
             }
             UsageTrack(stat: stat, trackColor: trackColor).frame(height: 6)
             if stat.available, let reset = stat.resetTime {
-                Text("resets \(resetText(reset))")
+                Text("resets \(resetText(reset, now: now))")
                     .font(.system(size: 9))
                     .foregroundColor(secondColor)
             } else if !stat.available {
@@ -157,8 +160,8 @@ struct WindowRow: View {
         }
     }
 
-    private func resetText(_ date: Date) -> String {
-        let interval = date.timeIntervalSinceNow
+    private func resetText(_ date: Date, now: Date) -> String {
+        let interval = date.timeIntervalSince(now)
         guard interval > 0 else { return "now" }
         if interval < 86_400 {
             let h = Int(interval) / 3600
