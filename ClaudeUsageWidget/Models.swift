@@ -69,19 +69,23 @@ struct UsageStats {
     let hour: WindowStat        // five_hour
     let week: WindowStat        // seven_day
     let sonnetWeek: WindowStat  // seven_day_sonnet
+    let opusWeek: WindowStat    // seven_day_opus
     let lastUpdated: Date
 
     init(from response: UsageResponse, lastUpdated: Date) {
         self.hour = WindowStat(from: response.five_hour)
         self.week = WindowStat(from: response.seven_day)
         self.sonnetWeek = WindowStat(from: response.seven_day_sonnet)
+        self.opusWeek = WindowStat(from: response.seven_day_opus)
         self.lastUpdated = lastUpdated
     }
 
-    init(hour: WindowStat, week: WindowStat, sonnetWeek: WindowStat, lastUpdated: Date) {
+    init(hour: WindowStat, week: WindowStat, sonnetWeek: WindowStat,
+         opusWeek: WindowStat = .unavailable, lastUpdated: Date) {
         self.hour = hour
         self.week = week
         self.sonnetWeek = sonnetWeek
+        self.opusWeek = opusWeek
         self.lastUpdated = lastUpdated
     }
 }

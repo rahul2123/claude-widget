@@ -67,6 +67,39 @@ func testAlertWindow() {
     }
 }
 
+// MARK: - Opus parsing
+
+func testOpusParsing() {
+    section("Opus parsing") {
+        let jsonPresent = """
+        {
+          "five_hour": {"utilization": 10.0, "resets_at": null},
+          "seven_day": {"utilization": 20.0, "resets_at": null},
+          "seven_day_sonnet": {"utilization": 30.0, "resets_at": null},
+          "seven_day_opus": {"utilization": 42.0, "resets_at": null}
+        }
+        """
+        let resp = try! JSONDecoder().decode(
+            UsageResponse.self, from: jsonPresent.data(using: .utf8)!)
+        let stats = UsageStats(from: resp, lastUpdated: Date())
+        expect(stats.opusWeek.available, "opus available when present")
+        expectEqual(stats.opusWeek.pct, 42.0, "opus pct == 42")
+
+        let jsonNull = """
+        {
+          "five_hour": {"utilization": 10.0, "resets_at": null},
+          "seven_day": {"utilization": 20.0, "resets_at": null},
+          "seven_day_sonnet": {"utilization": 30.0, "resets_at": null},
+          "seven_day_opus": null
+        }
+        """
+        let respNull = try! JSONDecoder().decode(
+            UsageResponse.self, from: jsonNull.data(using: .utf8)!)
+        let statsNull = UsageStats(from: respNull, lastUpdated: Date())
+        expect(!statsNull.opusWeek.available, "opus unavailable when null")
+    }
+}
+
 // MARK: - UsageAlert
 
 func testUsageAlert() {
@@ -364,6 +397,7 @@ func testAlertEvaluate() {
 @main struct TestRunner {
     static func main() {
         testAlertWindow()
+        testOpusParsing()
         testUsageAlert()
         testCanDecrement()
         testCanIncrement()

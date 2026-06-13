@@ -84,6 +84,9 @@ struct UsageContentView: View {
                 WindowRow(title: "5-hour", stat: stats.hour)
                 WindowRow(title: "Week", stat: stats.week)
                 WindowRow(title: "Sonnet (week)", stat: stats.sonnetWeek)
+                if stats.opusWeek.available {
+                    WindowRow(title: "Opus (week)", stat: stats.opusWeek)
+                }
             }
         } else {
             HStack(spacing: 6) {
