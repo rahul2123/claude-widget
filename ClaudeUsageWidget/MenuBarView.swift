@@ -267,15 +267,36 @@ struct SettingsView: View {
                     }
                 }
             }
-            settingsSection("Alert when usage exceeds") {
-                HStack(spacing: 4) {
-                    pillButton("Off", selected: service.alertThreshold == 0) {
-                        service.alertThreshold = 0
+            settingsSection("Alerts") {
+                VStack(spacing: 6) {
+                    if service.alerts.isEmpty {
+                        Text("No alerts — you won't be notified")
+                            .font(.system(size: 9))
+                            .foregroundColor(Color(red: 0.353, green: 0.353, blue: 0.376))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    ForEach([70, 80, 90], id: \.self) { threshold in
-                        pillButton("\(threshold)%", selected: service.alertThreshold == threshold) {
-                            service.alertThreshold = threshold
+                    ForEach($service.alerts) { $alert in
+                        alertRow($alert)
+                    }
+                    if service.alerts.count < 6 {
+                        Button(action: addAlert) {
+                            Text("+ Add alert")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(Color(red: 0.557, green: 0.557, blue: 0.576))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 7)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 7)
+                                        .stroke(Color(red: 0.227, green: 0.227, blue: 0.250),
+                                                style: StrokeStyle(lineWidth: 1, dash: [3]))
+                                )
                         }
+                        .buttonStyle(.plain)
+                    } else {
+                        Text("Max alerts reached (3 per window)")
+                            .font(.system(size: 9))
+                            .foregroundColor(Color(red: 0.388, green: 0.388, blue: 0.400))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
@@ -335,6 +356,90 @@ struct SettingsView: View {
                 )
         }
         .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func alertRow(_ alert: Binding<UsageAlert>) -> some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 2) {
+                windowSeg("5h", window: .hour, alert: alert)
+                windowSeg("Wk", window: .week, alert: alert)
+            }
+            .padding(2)
+            .background(RoundedRectangle(cornerRadius: 7)
+                .fill(Color(red: 0.086, green: 0.086, blue: 0.094)))
+
+            Spacer()
+
+            HStack(spacing: 0) {
+                stepBtn("–") {
+                    alert.wrappedValue.threshold = max(5, alert.wrappedValue.threshold - 5)
+                }
+                Text("\(alert.wrappedValue.threshold)%")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 40)
+                stepBtn("+") {
+                    alert.wrappedValue.threshold = min(100, alert.wrappedValue.threshold + 5)
+                }
+            }
+            .background(RoundedRectangle(cornerRadius: 6)
+                .fill(Color(red: 0.086, green: 0.086, blue: 0.094)))
+
+            Button(action: { removeAlert(alert.wrappedValue) }) {
+                Text("✕")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(red: 0.353, green: 0.353, blue: 0.376))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(7)
+        .background(RoundedRectangle(cornerRadius: 9)
+            .fill(Color(red: 0.137, green: 0.137, blue: 0.153)))
+    }
+
+    private func windowSeg(_ title: String, window: AlertWindow, alert: Binding<UsageAlert>) -> some View {
+        let selected = alert.wrappedValue.window == window
+        return Button(action: { switchWindow(alert, to: window) }) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(selected ? .white : Color(red: 0.557, green: 0.557, blue: 0.576))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(RoundedRectangle(cornerRadius: 5)
+                    .fill(selected ? Color(red: 0.039, green: 0.518, blue: 1.000) : Color.clear))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func stepBtn(_ s: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(s)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(Color(red: 0.784, green: 0.784, blue: 0.800))
+                .frame(width: 22, height: 22)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func addAlert() {
+        let hourCount = service.alerts.filter { $0.window == .hour }.count
+        let window: AlertWindow = hourCount < 3 ? .hour : .week
+        service.alerts.append(UsageAlert(window: window, threshold: 80))
+    }
+
+    private func switchWindow(_ alert: Binding<UsageAlert>, to window: AlertWindow) {
+        guard alert.wrappedValue.window != window else { return }
+        // Per-window cap: no-op if the target already holds 3 alerts.
+        let inTarget = service.alerts.filter {
+            $0.window == window && $0.id != alert.wrappedValue.id
+        }.count
+        guard inTarget < 3 else { return }
+        alert.wrappedValue.window = window
+    }
+
+    private func removeAlert(_ alert: UsageAlert) {
+        service.alerts.removeAll { $0.id == alert.id }
     }
 }
 
