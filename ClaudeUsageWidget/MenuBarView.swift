@@ -246,6 +246,7 @@ struct FooterView: View {
 struct SettingsView: View {
     @ObservedObject var service: UsageService
     @ObservedObject var desktop: DesktopWidgetController
+    @State private var alertTab: AlertWindow = .hour
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -269,16 +270,29 @@ struct SettingsView: View {
             }
             settingsSection("Alerts") {
                 VStack(spacing: 6) {
-                    if service.alerts.isEmpty {
-                        Text("No alerts — you won't be notified")
+                    // Tab bar
+                    HStack(spacing: 4) {
+                        ForEach(AlertWindow.allCases, id: \.self) { tab in
+                            pillButton(tab.label, selected: alertTab == tab) {
+                                alertTab = tab
+                            }
+                        }
+                    }
+                    // Alerts for active tab
+                    let tabAlerts = service.alerts.filter { $0.window == alertTab }
+                    if tabAlerts.isEmpty {
+                        Text("No alerts for this window")
                             .font(.system(size: 9))
                             .foregroundColor(Color(red: 0.353, green: 0.353, blue: 0.376))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     ForEach($service.alerts) { $alert in
-                        alertRow($alert)
+                        if alert.window == alertTab {
+                            alertRow($alert)
+                        }
                     }
-                    if service.alerts.count < 6 {
+                    let tabCount = service.alerts.filter { $0.window == alertTab }.count
+                    if tabCount < 3 {
                         Button(action: addAlert) {
                             Text("+ Add alert")
                                 .font(.system(size: 10, weight: .semibold))
@@ -293,7 +307,7 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                     } else {
-                        Text("Max alerts reached (3 per window)")
+                        Text("Max 3 alerts per window")
                             .font(.system(size: 9))
                             .foregroundColor(Color(red: 0.388, green: 0.388, blue: 0.400))
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -361,16 +375,7 @@ struct SettingsView: View {
     @ViewBuilder
     private func alertRow(_ alert: Binding<UsageAlert>) -> some View {
         HStack(spacing: 8) {
-            HStack(spacing: 2) {
-                windowSeg("5h", window: .hour, alert: alert)
-                windowSeg("Wk", window: .week, alert: alert)
-            }
-            .padding(2)
-            .background(RoundedRectangle(cornerRadius: 7)
-                .fill(Color(red: 0.086, green: 0.086, blue: 0.094)))
-
             Spacer()
-
             HStack(spacing: 0) {
                 stepBtn("–") {
                     alert.wrappedValue.threshold = max(5, alert.wrappedValue.threshold - 5)
@@ -398,20 +403,6 @@ struct SettingsView: View {
             .fill(Color(red: 0.137, green: 0.137, blue: 0.153)))
     }
 
-    private func windowSeg(_ title: String, window: AlertWindow, alert: Binding<UsageAlert>) -> some View {
-        let selected = alert.wrappedValue.window == window
-        return Button(action: { switchWindow(alert, to: window) }) {
-            Text(title)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(selected ? .white : Color(red: 0.557, green: 0.557, blue: 0.576))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background(RoundedRectangle(cornerRadius: 5)
-                    .fill(selected ? Color(red: 0.039, green: 0.518, blue: 1.000) : Color.clear))
-        }
-        .buttonStyle(.plain)
-    }
-
     private func stepBtn(_ s: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(s)
@@ -423,19 +414,7 @@ struct SettingsView: View {
     }
 
     private func addAlert() {
-        let hourCount = service.alerts.filter { $0.window == .hour }.count
-        let window: AlertWindow = hourCount < 3 ? .hour : .week
-        service.alerts.append(UsageAlert(window: window, threshold: 80))
-    }
-
-    private func switchWindow(_ alert: Binding<UsageAlert>, to window: AlertWindow) {
-        guard alert.wrappedValue.window != window else { return }
-        // Per-window cap: no-op if the target already holds 3 alerts.
-        let inTarget = service.alerts.filter {
-            $0.window == window && $0.id != alert.wrappedValue.id
-        }.count
-        guard inTarget < 3 else { return }
-        alert.wrappedValue.window = window
+        service.alerts.append(UsageAlert(window: alertTab, threshold: 80))
     }
 
     private func removeAlert(_ alert: UsageAlert) {
