@@ -77,6 +77,13 @@ struct UsageStats {
         self.sonnetWeek = WindowStat(from: response.seven_day_sonnet)
         self.lastUpdated = lastUpdated
     }
+
+    init(hour: WindowStat, week: WindowStat, sonnetWeek: WindowStat, lastUpdated: Date) {
+        self.hour = hour
+        self.week = week
+        self.sonnetWeek = sonnetWeek
+        self.lastUpdated = lastUpdated
+    }
 }
 
 // MARK: - Pinned Window (menu bar label selection)
@@ -93,4 +100,21 @@ enum PinnedWindow: String, CaseIterable {
         case .bothHourWeek: return "5h+Wk"
         }
     }
+}
+
+// MARK: - Usage Alerts
+
+enum AlertWindow: String, Codable, CaseIterable {
+    case hour, week
+
+    /// Short label for the segmented toggle.
+    var label: String { self == .hour ? "5h" : "Wk" }
+    /// Human label used in the notification body.
+    var notifLabel: String { self == .hour ? "5-hour" : "Weekly" }
+}
+
+struct UsageAlert: Codable, Identifiable, Equatable {
+    var id = UUID()
+    var window: AlertWindow
+    var threshold: Int   // 5...100, multiples of 5
 }

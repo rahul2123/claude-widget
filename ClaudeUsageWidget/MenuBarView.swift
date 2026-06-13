@@ -246,6 +246,7 @@ struct FooterView: View {
 struct SettingsView: View {
     @ObservedObject var service: UsageService
     @ObservedObject var desktop: DesktopWidgetController
+    @State private var alertTab: AlertWindow = .hour
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -267,15 +268,58 @@ struct SettingsView: View {
                     }
                 }
             }
-            settingsSection("Alert when usage exceeds") {
-                HStack(spacing: 4) {
-                    pillButton("Off", selected: service.alertThreshold == 0) {
-                        service.alertThreshold = 0
-                    }
-                    ForEach([70, 80, 90], id: \.self) { threshold in
-                        pillButton("\(threshold)%", selected: service.alertThreshold == threshold) {
-                            service.alertThreshold = threshold
+            settingsSection("Alerts") {
+                VStack(spacing: 6) {
+                    // Tab bar
+                    HStack(spacing: 4) {
+                        ForEach(AlertWindow.allCases, id: \.self) { tab in
+                            pillButton(tab.label, selected: alertTab == tab) {
+                                alertTab = tab
+                            }
                         }
+                    }
+                    // Sorted indices of alerts for active tab
+                    let tabPairs = AlertValidation.sortedTabPairs(in: service.alerts, tab: alertTab)
+                    if tabPairs.isEmpty {
+                        HStack {
+                            Spacer()
+                            Text("No alerts for this window")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(red: 0.333, green: 0.333, blue: 0.345))
+                            Spacer()
+                        }
+                        .padding(.vertical, 14)
+                        .background(RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color(red: 0.180, green: 0.180, blue: 0.196),
+                                    style: StrokeStyle(lineWidth: 1, dash: [4])))
+                    }
+                    ForEach(Array(tabPairs.enumerated()), id: \.element.offset) { tabIdx, pair in
+                        let prev = tabIdx > 0 ? tabPairs[tabIdx - 1].element.threshold : nil
+                        let next = tabIdx < tabPairs.count - 1 ? tabPairs[tabIdx + 1].element.threshold : nil
+                        alertRow($service.alerts[pair.offset], index: tabIdx + 1,
+                                 prevThreshold: prev, nextThreshold: next)
+                    }
+                    if tabPairs.count < 3 {
+                        Button(action: addAlert) {
+                            Text("+ Add alert for \(alertTab.notifLabel)")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(Color(red: 0.039, green: 0.518, blue: 1.000))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color(red: 0.039, green: 0.518, blue: 1.000).opacity(0.08))
+                                        .overlay(RoundedRectangle(cornerRadius: 10)
+                                            .stroke(Color(red: 0.039, green: 0.518, blue: 1.000).opacity(0.25),
+                                                    style: StrokeStyle(lineWidth: 1, dash: [4])))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Text("Max 3 alerts per window")
+                            .font(.system(size: 9))
+                            .foregroundColor(Color(red: 0.388, green: 0.388, blue: 0.400))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
@@ -335,6 +379,88 @@ struct SettingsView: View {
                 )
         }
         .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func alertRow(_ alert: Binding<UsageAlert>, index: Int,
+                          prevThreshold: Int?, nextThreshold: Int?) -> some View {
+        let t = alert.wrappedValue.threshold
+        let canDec = AlertValidation.canDecrement(threshold: t, prevThreshold: prevThreshold)
+        let canInc = AlertValidation.canIncrement(threshold: t, nextThreshold: nextThreshold)
+        HStack(spacing: 10) {
+            // Icon
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(LinearGradient(
+                        colors: [Color(red: 0.110, green: 0.239, blue: 0.384),
+                                 Color(red: 0.051, green: 0.176, blue: 0.290)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 30, height: 30)
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(red: 0.118, green: 0.251, blue: 0.435), lineWidth: 1))
+                Text("🔔")
+                    .font(.system(size: 14))
+            }
+            // Labels
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Alert \(index)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Color(red: 0.878, green: 0.878, blue: 0.898))
+                Text("fires at or above")
+                    .font(.system(size: 9))
+                    .foregroundColor(Color(red: 0.333, green: 0.333, blue: 0.345))
+            }
+            Spacer()
+            // Stepper
+            HStack(spacing: 0) {
+                stepBtn("–", enabled: canDec) {
+                    alert.wrappedValue.threshold -= 5
+                }
+                Text("\(t)%")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 38)
+                stepBtn("+", enabled: canInc) {
+                    alert.wrappedValue.threshold += 5
+                }
+            }
+            .background(RoundedRectangle(cornerRadius: 7)
+                .fill(Color(red: 0.086, green: 0.086, blue: 0.094)))
+            // Remove
+            Button(action: { removeAlert(alert.wrappedValue) }) {
+                Text("✕")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(red: 0.353, green: 0.353, blue: 0.376))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(9)
+        .background(RoundedRectangle(cornerRadius: 10)
+            .fill(Color(red: 0.137, green: 0.137, blue: 0.153))
+            .overlay(RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(red: 0.180, green: 0.180, blue: 0.196), lineWidth: 1)))
+    }
+
+    private func stepBtn(_ s: String, enabled: Bool, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(s)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(enabled
+                    ? Color(red: 0.784, green: 0.784, blue: 0.800)
+                    : Color(red: 0.180, green: 0.180, blue: 0.196))
+                .frame(width: 22, height: 22)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+    }
+
+    private func addAlert() {
+        let threshold = AlertValidation.defaultThreshold(forTab: alertTab, existing: service.alerts)
+        service.alerts.append(UsageAlert(window: alertTab, threshold: threshold))
+    }
+
+    private func removeAlert(_ alert: UsageAlert) {
+        service.alerts.removeAll { $0.id == alert.id }
     }
 }
 

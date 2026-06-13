@@ -20,13 +20,18 @@ class UsageService: ObservableObject {
         }
     }
 
-    @Published var alertThreshold: Int {
-        didSet { UserDefaults.standard.set(alertThreshold, forKey: Self.alertKey) }
+    @Published var alerts: [UsageAlert] {
+        didSet {
+            if let data = try? JSONEncoder().encode(alerts) {
+                UserDefaults.standard.set(data, forKey: Self.alertsKey)
+            }
+        }
     }
 
-    private static let pinnedKey  = "pinnedWindow"
-    private static let refreshKey = "refreshIntervalMinutes"
-    private static let alertKey   = "alertThreshold"
+    private static let pinnedKey      = "pinnedWindow"
+    private static let refreshKey     = "refreshIntervalMinutes"
+    private static let alertsKey      = "usageAlerts"
+    private static let legacyAlertKey = "alertThreshold"
     private static let usageURL   = URL(string: "https://api.anthropic.com/api/oauth/usage")!
     private static let betaHeader = "oauth-2025-04-20"
 
@@ -41,11 +46,26 @@ class UsageService: ObservableObject {
         let storedRefresh = UserDefaults.standard.integer(forKey: Self.refreshKey)
         self.refreshMinutes = storedRefresh > 0 ? storedRefresh : 5
 
-        self.alertThreshold = UserDefaults.standard.integer(forKey: Self.alertKey)
+        if let data = UserDefaults.standard.data(forKey: Self.alertsKey),
+           let decoded = try? JSONDecoder().decode([UsageAlert].self, from: data) {
+            self.alerts = decoded
+        } else if UserDefaults.standard.integer(forKey: Self.legacyAlertKey) > 0 {
+            // Migrate the old single threshold to one Weekly alert, persist it,
+            // and drop the legacy key so this runs only once.
+            let legacy = UserDefaults.standard.integer(forKey: Self.legacyAlertKey)
+            let seeded = [UsageAlert(window: .week, threshold: legacy)]
+            self.alerts = seeded
+            if let data = try? JSONEncoder().encode(seeded) {
+                UserDefaults.standard.set(data, forKey: Self.alertsKey)
+            }
+            UserDefaults.standard.removeObject(forKey: Self.legacyAlertKey)
+        } else {
+            self.alerts = []
+        }
 
         self.historyPoints = UsageHistoryStore.shared.points.map { $0.hourPct }
 
-        log("🔧 UsageService init — refresh=\(refreshMinutes)m alert=\(alertThreshold)%")
+        log("🔧 UsageService init — refresh=\(refreshMinutes)m alerts=\(alerts.count)")
         fetchUsage()
         scheduleTimer()
     }
@@ -146,7 +166,7 @@ class UsageService: ObservableObject {
                 historyPoints = UsageHistoryStore.shared.points.map { $0.hourPct }
             }
 
-            AlertService.check(stats: newStats, threshold: alertThreshold, alerted: &alertedWindows)
+            AlertService.check(stats: newStats, alerts: alerts, alerted: &alertedWindows)
 
             log("✅ updated: 5h=\(Int(newStats.hour.pct))% 7d=\(Int(newStats.week.pct))%")
         } catch {
