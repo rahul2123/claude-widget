@@ -278,31 +278,43 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    // Alerts for active tab
-                    let tabAlerts = service.alerts.filter { $0.window == alertTab }
-                    if tabAlerts.isEmpty {
-                        Text("No alerts for this window")
-                            .font(.system(size: 9))
-                            .foregroundColor(Color(red: 0.353, green: 0.353, blue: 0.376))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    ForEach($service.alerts) { $alert in
-                        if alert.window == alertTab {
-                            alertRow($alert)
+                    // Sorted indices of alerts for active tab
+                    let tabPairs = service.alerts
+                        .enumerated()
+                        .filter { $0.element.window == alertTab }
+                        .sorted { $0.element.threshold < $1.element.threshold }
+                    if tabPairs.isEmpty {
+                        HStack {
+                            Spacer()
+                            Text("No alerts for this window")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(red: 0.333, green: 0.333, blue: 0.345))
+                            Spacer()
                         }
+                        .padding(.vertical, 14)
+                        .background(RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color(red: 0.180, green: 0.180, blue: 0.196),
+                                    style: StrokeStyle(lineWidth: 1, dash: [4])))
                     }
-                    let tabCount = service.alerts.filter { $0.window == alertTab }.count
-                    if tabCount < 3 {
+                    ForEach(Array(tabPairs.enumerated()), id: \.element.offset) { tabIdx, pair in
+                        let prev = tabIdx > 0 ? tabPairs[tabIdx - 1].element.threshold : nil
+                        let next = tabIdx < tabPairs.count - 1 ? tabPairs[tabIdx + 1].element.threshold : nil
+                        alertRow($service.alerts[pair.offset], index: tabIdx + 1,
+                                 prevThreshold: prev, nextThreshold: next)
+                    }
+                    if tabPairs.count < 3 {
                         Button(action: addAlert) {
-                            Text("+ Add alert")
+                            Text("+ Add alert for \(alertTab.notifLabel)")
                                 .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(Color(red: 0.557, green: 0.557, blue: 0.576))
+                                .foregroundColor(Color(red: 0.039, green: 0.518, blue: 1.000))
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 7)
+                                .padding(.vertical, 8)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 7)
-                                        .stroke(Color(red: 0.227, green: 0.227, blue: 0.250),
-                                                style: StrokeStyle(lineWidth: 1, dash: [3]))
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color(red: 0.039, green: 0.518, blue: 1.000).opacity(0.08))
+                                        .overlay(RoundedRectangle(cornerRadius: 10)
+                                            .stroke(Color(red: 0.039, green: 0.518, blue: 1.000).opacity(0.25),
+                                                    style: StrokeStyle(lineWidth: 1, dash: [4])))
                                 )
                         }
                         .buttonStyle(.plain)
@@ -373,24 +385,51 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func alertRow(_ alert: Binding<UsageAlert>) -> some View {
-        HStack(spacing: 8) {
+    private func alertRow(_ alert: Binding<UsageAlert>, index: Int,
+                          prevThreshold: Int?, nextThreshold: Int?) -> some View {
+        let t = alert.wrappedValue.threshold
+        let canDec = t > 5 && (prevThreshold == nil || t - 5 > prevThreshold!)
+        let canInc = t < 100 && (nextThreshold == nil || t + 5 < nextThreshold!)
+        HStack(spacing: 10) {
+            // Icon
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(LinearGradient(
+                        colors: [Color(red: 0.110, green: 0.239, blue: 0.384),
+                                 Color(red: 0.051, green: 0.176, blue: 0.290)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 30, height: 30)
+                    .overlay(RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(red: 0.118, green: 0.251, blue: 0.435), lineWidth: 1))
+                Text("🔔")
+                    .font(.system(size: 14))
+            }
+            // Labels
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Alert \(index)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Color(red: 0.878, green: 0.878, blue: 0.898))
+                Text("fires at or above")
+                    .font(.system(size: 9))
+                    .foregroundColor(Color(red: 0.333, green: 0.333, blue: 0.345))
+            }
             Spacer()
+            // Stepper
             HStack(spacing: 0) {
-                stepBtn("–") {
-                    alert.wrappedValue.threshold = max(5, alert.wrappedValue.threshold - 5)
+                stepBtn("–", enabled: canDec) {
+                    alert.wrappedValue.threshold -= 5
                 }
-                Text("\(alert.wrappedValue.threshold)%")
+                Text("\(t)%")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white)
-                    .frame(width: 40)
-                stepBtn("+") {
-                    alert.wrappedValue.threshold = min(100, alert.wrappedValue.threshold + 5)
+                    .frame(width: 38)
+                stepBtn("+", enabled: canInc) {
+                    alert.wrappedValue.threshold += 5
                 }
             }
-            .background(RoundedRectangle(cornerRadius: 6)
+            .background(RoundedRectangle(cornerRadius: 7)
                 .fill(Color(red: 0.086, green: 0.086, blue: 0.094)))
-
+            // Remove
             Button(action: { removeAlert(alert.wrappedValue) }) {
                 Text("✕")
                     .font(.system(size: 11))
@@ -398,23 +437,31 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(7)
-        .background(RoundedRectangle(cornerRadius: 9)
-            .fill(Color(red: 0.137, green: 0.137, blue: 0.153)))
+        .padding(9)
+        .background(RoundedRectangle(cornerRadius: 10)
+            .fill(Color(red: 0.137, green: 0.137, blue: 0.153))
+            .overlay(RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(red: 0.180, green: 0.180, blue: 0.196), lineWidth: 1)))
     }
 
-    private func stepBtn(_ s: String, _ action: @escaping () -> Void) -> some View {
+    private func stepBtn(_ s: String, enabled: Bool, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(s)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Color(red: 0.784, green: 0.784, blue: 0.800))
+                .foregroundColor(enabled
+                    ? Color(red: 0.784, green: 0.784, blue: 0.800)
+                    : Color(red: 0.180, green: 0.180, blue: 0.196))
                 .frame(width: 22, height: 22)
         }
         .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 
     private func addAlert() {
-        service.alerts.append(UsageAlert(window: alertTab, threshold: 80))
+        let sorted = service.alerts.filter { $0.window == alertTab }
+            .sorted { $0.threshold < $1.threshold }
+        let defaultThreshold = sorted.last.map { min(100, $0.threshold + 5) } ?? 80
+        service.alerts.append(UsageAlert(window: alertTab, threshold: defaultThreshold))
     }
 
     private func removeAlert(_ alert: UsageAlert) {
