@@ -2,31 +2,30 @@ import Foundation
 import UserNotifications
 
 enum AlertService {
-    /// Check all windows against threshold. `alerted` tracks which windows have
-    /// already fired a notification; cleared when the window drops 5% below threshold.
-    static func check(stats: UsageStats, threshold: Int, alerted: inout Set<String>) {
-        guard threshold > 0 else { return }
-
-        let windows: [(key: String, label: String, stat: WindowStat)] = [
-            ("hour",   "5-hour",        stats.hour),
-            ("week",   "Weekly",        stats.week),
-            ("sonnet", "Sonnet (week)", stats.sonnetWeek),
-        ]
-
-        for (key, label, stat) in windows {
+    /// Check each alert against its window. `alerted` tracks fired alerts keyed
+    /// by "window-threshold"; an entry is cleared when its window drops 5% below
+    /// the alert's threshold (re-arm).
+    static func check(stats: UsageStats, alerts: [UsageAlert], alerted: inout Set<String>) {
+        for alert in alerts {
+            let stat = alert.window == .hour ? stats.hour : stats.week
             guard stat.available else { continue }
-            if stat.pct >= Double(threshold) {
+
+            let key = "\(alert.window.rawValue)-\(alert.threshold)"
+            if stat.pct >= Double(alert.threshold) {
                 if !alerted.contains(key) {
                     alerted.insert(key)
-                    fire(label: label, pct: stat.pct, resetTime: stat.resetTime)
+                    fire(label: alert.window.notifLabel,
+                         pct: stat.pct,
+                         resetTime: stat.resetTime,
+                         identifier: "usage-alert-\(key)")
                 }
-            } else if stat.pct < Double(threshold) - 5.0 {
+            } else if stat.pct < Double(alert.threshold) - 5.0 {
                 alerted.remove(key)
             }
         }
     }
 
-    private static func fire(label: String, pct: Double, resetTime: Date?) {
+    private static func fire(label: String, pct: Double, resetTime: Date?, identifier: String) {
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return }
@@ -35,7 +34,7 @@ enum AlertService {
             content.body = "\(label) at \(Int(pct))%\(resetSuffix(resetTime))"
             content.sound = .default
             let request = UNNotificationRequest(
-                identifier: "usage-alert-\(label)-\(Int(pct))",
+                identifier: identifier,
                 content: content,
                 trigger: nil
             )
