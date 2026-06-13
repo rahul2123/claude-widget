@@ -77,6 +77,13 @@ struct UsageStats {
         self.sonnetWeek = WindowStat(from: response.seven_day_sonnet)
         self.lastUpdated = lastUpdated
     }
+
+    init(hour: WindowStat, week: WindowStat, sonnetWeek: WindowStat, lastUpdated: Date) {
+        self.hour = hour
+        self.week = week
+        self.sonnetWeek = sonnetWeek
+        self.lastUpdated = lastUpdated
+    }
 }
 
 // MARK: - Pinned Window (menu bar label selection)

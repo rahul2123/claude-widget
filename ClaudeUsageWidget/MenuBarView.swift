@@ -279,10 +279,7 @@ struct SettingsView: View {
                         }
                     }
                     // Sorted indices of alerts for active tab
-                    let tabPairs = service.alerts
-                        .enumerated()
-                        .filter { $0.element.window == alertTab }
-                        .sorted { $0.element.threshold < $1.element.threshold }
+                    let tabPairs = AlertValidation.sortedTabPairs(in: service.alerts, tab: alertTab)
                     if tabPairs.isEmpty {
                         HStack {
                             Spacer()
@@ -388,8 +385,8 @@ struct SettingsView: View {
     private func alertRow(_ alert: Binding<UsageAlert>, index: Int,
                           prevThreshold: Int?, nextThreshold: Int?) -> some View {
         let t = alert.wrappedValue.threshold
-        let canDec = t > 5 && (prevThreshold == nil || t - 5 > prevThreshold!)
-        let canInc = t < 100 && (nextThreshold == nil || t + 5 < nextThreshold!)
+        let canDec = AlertValidation.canDecrement(threshold: t, prevThreshold: prevThreshold)
+        let canInc = AlertValidation.canIncrement(threshold: t, nextThreshold: nextThreshold)
         HStack(spacing: 10) {
             // Icon
             ZStack {
@@ -458,10 +455,8 @@ struct SettingsView: View {
     }
 
     private func addAlert() {
-        let sorted = service.alerts.filter { $0.window == alertTab }
-            .sorted { $0.threshold < $1.threshold }
-        let defaultThreshold = sorted.last.map { min(100, $0.threshold + 5) } ?? 80
-        service.alerts.append(UsageAlert(window: alertTab, threshold: defaultThreshold))
+        let threshold = AlertValidation.defaultThreshold(forTab: alertTab, existing: service.alerts)
+        service.alerts.append(UsageAlert(window: alertTab, threshold: threshold))
     }
 
     private func removeAlert(_ alert: UsageAlert) {

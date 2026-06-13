@@ -6,22 +6,14 @@ enum AlertService {
     /// by "window-threshold"; an entry is cleared when its window drops 5% below
     /// the alert's threshold (re-arm).
     static func check(stats: UsageStats, alerts: [UsageAlert], alerted: inout Set<String>) {
-        for alert in alerts {
-            let stat = alert.window == .hour ? stats.hour : stats.week
-            guard stat.available else { continue }
-
-            let key = "\(alert.window.rawValue)-\(alert.threshold)"
-            if stat.pct >= Double(alert.threshold) {
-                if !alerted.contains(key) {
-                    alerted.insert(key)
-                    fire(label: alert.window.notifLabel,
-                         pct: stat.pct,
-                         resetTime: stat.resetTime,
-                         identifier: "usage-alert-\(key)")
-                }
-            } else if stat.pct < Double(alert.threshold) - 5.0 {
-                alerted.remove(key)
-            }
+        let result = AlertValidation.evaluate(stats: stats, alerts: alerts, alerted: alerted)
+        result.toArm.forEach { alerted.insert($0) }
+        result.toDisarm.forEach { alerted.remove($0) }
+        for item in result.toFire {
+            fire(label: item.alert.window.notifLabel,
+                 pct: item.pct,
+                 resetTime: item.resetTime,
+                 identifier: "usage-alert-\(item.alert.window.rawValue)-\(item.alert.threshold)")
         }
     }
 
