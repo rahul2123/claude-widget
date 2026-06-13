@@ -331,6 +331,23 @@ struct SettingsView: View {
             }
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
+                    Text("Launch at login")
+                        .font(.system(size: 11))
+                    Text("Start automatically when you log in")
+                        .font(.system(size: 9))
+                        .foregroundColor(Color(red: 0.388, green: 0.388, blue: 0.400))
+                }
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { LoginItemService.isEnabled },
+                    set: { LoginItemService.setEnabled($0) }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .scaleEffect(0.8)
+            }
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
                     Text("Desktop widget")
                         .font(.system(size: 11))
                     Text("Floating always-on-top panel")
