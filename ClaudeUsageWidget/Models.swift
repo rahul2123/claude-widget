@@ -94,3 +94,20 @@ enum PinnedWindow: String, CaseIterable {
         }
     }
 }
+
+// MARK: - Usage Alerts
+
+enum AlertWindow: String, Codable, CaseIterable {
+    case hour, week
+
+    /// Short label for the segmented toggle.
+    var label: String { self == .hour ? "5h" : "Wk" }
+    /// Human label used in the notification body.
+    var notifLabel: String { self == .hour ? "5-hour" : "Weekly" }
+}
+
+struct UsageAlert: Codable, Identifiable, Equatable {
+    var id = UUID()
+    var window: AlertWindow
+    var threshold: Int   // 5...100, multiples of 5
+}
